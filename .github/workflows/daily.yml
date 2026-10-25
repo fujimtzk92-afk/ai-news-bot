@@ -1,0 +1,34 @@
+name: Daily AI News
+
+on:
+  schedule:
+    - cron: "30 22 * * *"   
+  workflow_dispatch:         
+
+permissions:
+  contents: write            
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4 
+      - uses: actions/setup-python@v5    
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt   
+
+      - run: python main.py                
+        env:
+          X_CONSUMER_KEY: ${{ secrets.X_CONSUMER_KEY }}
+          X_CONSUMER_SECRET: ${{ secrets.X_CONSUMER_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - run: |                            
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add posted.txt
+          git commit -m "Update posted.txt" || echo "No changes"
+          git push

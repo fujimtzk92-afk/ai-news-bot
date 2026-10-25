@@ -1,0 +1,4 @@
+tweepy
+anthropic
+feedparser
+python-dotenv
