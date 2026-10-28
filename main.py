@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import requests
 import tweepy
@@ -31,15 +32,60 @@ if os.path.exists("posted.txt"):
     with open("posted.txt") as f:
         posted = f.read().splitlines()
  
-entry = None
-for e in feed.entries:
-    if e.link not in posted:
-        entry = e
-        break
+# まだ投稿していない記事を最大10本集める
+candidates = [e for e in feed.entries if e.link not in posted][:10]
  
-if entry is None:
+if not candidates:
     print("新しい記事がない")
     exit()
+ 
+client = anthropic.Anthropic()
+ 
+# 候補が1本ならそれを使う。2本以上ならAIに一番いいものを選ばせる
+if len(candidates) == 1:
+    entry = candidates[0]
+else:
+    article_list = ""
+    for i, e in enumerate(candidates, start=1):
+        summary = e.get("summary", "")[:300]
+        article_list += f"{i}. {e.title}\n{summary}\n\n"
+ 
+    select_prompt = f"""次のAIニュースの中から、Xで投稿するものを1本選んでください。
+ 
+読者と発信者:
+{PERSPECTIVE}
+ 
+選ぶ基準（上ほど優先）:
+- 読者が知らないと損をする、大きなニュース（大手AI企業の新製品・新機能、料金の変更、大きな資金調達や上場など）
+- 読者が今日から仕事に使えるツールや機能の話
+- 読者の仕事やお金の稼ぎ方に直接つながる話
+ 
+避けるもの:
+- 読者の仕事から遠い専門的な業界の話
+- 小さな企業の細かいニュース
+ 
+記事一覧:
+{article_list}
+選んだ記事の番号だけを出力してください。"""
+ 
+    res = client.messages.create(
+        model="claude-haiku-5-5",
+        max_tokens=8000,
+        messages=[{"role": "user", "content": select_prompt}],
+    )
+    answer = ""
+    for block in res.content:
+        if block.type == "text":
+            answer += block.text
+ 
+    # 返ってきた文字から番号を取り出す。うまく取れなければ1本目を使う
+    numbers = re.findall(r"\d+", answer)
+    index = int(numbers[0]) if numbers else 1
+    if not 1 <= index <= len(candidates):
+        index = 1
+    entry = candidates[index - 1]
+ 
+print("選んだ記事:", entry.title)
  
  
 # ---------- 2. AIに3案作らせる ----------
@@ -64,12 +110,16 @@ prompt = f"""次の英語のAIニュースを読んで、日本語のXの投稿�
 - ハッシュタグと絵文字は使わない
 - 案と案の間は「===」だけの行で区切る
 - 投稿文以外は何も出力しない
+
+- 案3は、多くの人が当然だと思っていることに反対するか、意外な角度から意見を言う
+- 案3では、自分の意見への反論を先回りして和らげない
+- 最後の一文は、具体的な行動か、意外な一言で終わる
+- 英語の専門用語はそのまま使わず、日本語で分かる言い方にする
  
 タイトル: {entry.title}
 概要: {entry.get("summary", "")}
 """
  
-client = anthropic.Anthropic()
 message = client.messages.create(
     model="claude-haiku-5-5",
     max_tokens=16000,
@@ -82,8 +132,6 @@ for block in message.content:
         text += block.text
  
 drafts = [d.strip() for d in text.split("===") if d.strip()]
-print(message.stop_reason)
-print(text)
 if not drafts:
     print("案が作れなかった")
     exit()
