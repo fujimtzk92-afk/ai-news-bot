@@ -3,7 +3,6 @@ from types import SimpleNamespace
 
 import anthropic
 import feedparser
-import httpx
 import tweepy
 
 import main
@@ -215,11 +214,14 @@ def test_append_rows_does_not_store_post_text(tmp_path, monkeypatch):
 
 
 def test_analysis_failure_still_returns_message():
+    class FakeAPIError(anthropic.APIError):
+        def __init__(self):
+            pass
+
     class FailingClient:
         class messages:
             @staticmethod
             def create(**kwargs):
-                request = httpx.Request("POST", "https://api.anthropic.com")
-                raise anthropic.APIConnectionError(request=request)
+                raise FakeAPIError()
 
     assert "数字だけ" in metrics.write_analysis(FailingClient(), "数字")
