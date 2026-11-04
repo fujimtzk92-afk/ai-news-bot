@@ -1,7 +1,9 @@
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
+import anthropic
 import feedparser
+import httpx
 import tweepy
 
 import main
@@ -160,3 +162,64 @@ def test_report_compares_only_mature_posts():
 def test_report_without_data():
     now = datetime(2026, 11, 20, tzinfo=timezone.utc)
     assert "フォロワー 不明" in metrics.build_report([], [], now)
+
+
+def snapshot_row(tweet_id, impressions, followers, fetched_at="2026-11-01 00:00"):
+    return {
+        "fetched_at": fetched_at, "tweet_id": tweet_id, "impressions": impressions,
+        "followers": followers, "created_at": "2026-10-20 00:00",
+    }
+
+
+def test_gained_impressions_counts_new_posts_in_full():
+    previous = [snapshot_row("1", "100", "14")]
+    current = [snapshot_row("1", 150, 20), snapshot_row("2", 30, 20)]
+    assert metrics.gained_impressions(current, previous) == 80
+
+
+def test_report_shows_growth_since_last_snapshot():
+    now = datetime(2026, 11, 20, tzinfo=timezone.utc)
+    older = [snapshot_row("1", "50", "10", "2026-11-06 00:00")]
+    previous = [snapshot_row("1", "100", "14", "2026-11-13 00:00")]
+    current = [{**metric_row("1", 150, "2026-11-18 00:00"), "followers": 20, "text": "本文です"}]
+    report = metrics.build_report([], current, now, [older, previous])
+    assert "2026-11-13からのフォロワー増減: +6人" in report
+    assert "増えた表示回数: 50（その前の期間は 50）" in report
+    assert "直近7日の投稿: 1件" in report
+    assert "「本文です」" in report
+
+
+def test_report_explains_first_run_without_history():
+    now = datetime(2026, 11, 20, tzinfo=timezone.utc)
+    rows = [metric_row("1", 100, "2026-11-01 00:00")]
+    assert "増減は次回から" in metrics.build_report([], rows, now, [])
+
+
+def test_load_snapshots_groups_by_time(tmp_path, monkeypatch):
+    path = tmp_path / "metrics.csv"
+    monkeypatch.setattr(metrics, "METRICS_FILE", str(path))
+    assert metrics.load_snapshots() == []
+    rows = [dict.fromkeys(metrics.METRICS_FIELDS, "x") for _ in range(2)]
+    rows[0]["fetched_at"] = "2026-11-01 00:00"
+    rows[1]["fetched_at"] = "2026-11-08 00:00"
+    metrics.append_rows(rows)
+    assert [len(s) for s in metrics.load_snapshots()] == [1, 1]
+
+
+def test_append_rows_does_not_store_post_text(tmp_path, monkeypatch):
+    path = tmp_path / "metrics.csv"
+    monkeypatch.setattr(metrics, "METRICS_FILE", str(path))
+    row = dict.fromkeys(metrics.METRICS_FIELDS, "x")
+    metrics.append_rows([{**row, "text": "本文"}])
+    assert "本文" not in path.read_text()
+
+
+def test_analysis_failure_still_returns_message():
+    class FailingClient:
+        class messages:
+            @staticmethod
+            def create(**kwargs):
+                request = httpx.Request("POST", "https://api.anthropic.com")
+                raise anthropic.APIConnectionError(request=request)
+
+    assert "数字だけ" in metrics.write_analysis(FailingClient(), "数字")
