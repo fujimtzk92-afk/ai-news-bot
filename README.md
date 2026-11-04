@@ -1,10 +1,12 @@
 # AI News Bot
 
 ## What it does
-This bot summarizes and translates AI-related news into Japanese and posts it on X automatically, three times a day.
+This bot turns AI news into Japanese drafts once a day. I choose one draft on Telegram, and the bot posts it on X.
 
 ## How it works
-Get news from RSS -> check the URLs of posted news -> select one article -> summarize it with Claude -> post it on X -> record the URL -> repeat it three times a day with GitHub Actions
+Get news from several RSS feeds -> skip posted and old articles -> Claude selects one article -> Claude writes three drafts -> I choose on Telegram -> post on X -> record the result in `posted.txt` and `posts.csv`
+
+Once a week, `metrics.py` saves the numbers for my posts to `metrics.csv` and sends a report to Telegram. It compares draft types and link placement (in the post or in a reply).
 
 ## Tech stack
 Python, Claude API, X API (tweepy), RSS (feedparser), GitHub Actions
