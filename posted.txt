@@ -17,3 +17,4 @@ https://blog.google/innovation-and-ai/technology/ai/google-ai-updates-october-20
 https://techcrunch.com/2026/11/04/almost-no-one-uses-ai-agents-to-book-their-uber-company-says/
 https://techcrunch.com/podcast/how-a-blue-wave-midterm-might-reshape-the-ai-industry/
 https://arstechnica.com/tech-policy/2026/11/does-meta-think-we-cant-read-meta-abandons-sketchy-commercial-terms-update/
+https://arstechnica.com/ai/2026/11/claude-code-settings-files-expose-thousands-of-secrets-on-github/
