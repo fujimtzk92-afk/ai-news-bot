@@ -1,0 +1,58 @@
+name: Auto Posts
+
+# リンクなしの投稿を1日10回、自動で出す。止める時は、GitHubのActionsの画面でこのworkflowをDisableにする
+on:
+  schedule:
+    # 日本時間の 7:10, 8:40, 10:20, 12:10, 13:40, 15:30, 17:50, 19:40, 21:20, 22:50
+    - cron: "10 22 * * *"
+    - cron: "40 23 * * *"
+    - cron: "20 1 * * *"
+    - cron: "10 3 * * *"
+    - cron: "40 4 * * *"
+    - cron: "30 6 * * *"
+    - cron: "50 8 * * *"
+    - cron: "40 10 * * *"
+    - cron: "20 12 * * *"
+    - cron: "50 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 同時に2つ動くと上限の数え方がずれるので、1つずつ動かす
+concurrency:
+  group: auto-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - run: python auto_post.py
+        env:
+          X_CONSUMER_KEY: ${{ secrets.X_CONSUMER_KEY }}
+          X_CONSUMER_SECRET: ${{ secrets.X_CONSUMER_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      # 記録を残せないと上限を数えられないので、他の更新とぶつかったらやり直す
+      - if: always()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          [ -f auto_posts.jsonl ] && git add auto_posts.jsonl
+          git commit -m "Update auto_posts.jsonl" || echo "No changes"
+          for i in 1 2 3; do
+            git pull --rebase && git push && break
+            sleep 10
+          done

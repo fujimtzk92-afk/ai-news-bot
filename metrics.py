@@ -9,6 +9,7 @@ import anthropic
 import tweepy
 from dotenv import load_dotenv
 
+from auto_post import load_log as load_auto_log
 from main import POSTS_LOG_FILE, ask_claude, send_telegram
 
 METRICS_FILE = "metrics.csv"
@@ -16,9 +17,13 @@ METRICS_FIELDS = [
     "fetched_at", "tweet_id", "created_at", "impressions",
     "likes", "reposts", "replies", "bookmarks", "followers",
 ]
-MAX_POSTS = 30  # 1件ごとに課金されるので、週1回に必要な分だけ読む
+MAX_POSTS = 100  # 1回で読める上限。自動投稿で週に約80件になるので、30から増やした
 MIN_AGE_DAYS = 3  # 投稿直後は表示回数が伸びきっていないので比べない
-DRAFT_NAMES = {"1": "案1 速報", "2": "案2 解説", "3": "案3 意見"}
+DRAFT_NAMES = {
+    "1": "案1 速報", "2": "案2 解説", "3": "案3 意見",
+    "auto-news": "自動 速報", "auto-explain": "自動 解説",
+    "auto-opinion": "自動 意見", "auto-question": "自動 問い",
+}
 
 
 def fetch_rows(x_client, now):
@@ -103,10 +108,18 @@ def build_growth_lines(rows, snapshots, now):
 
 
 def load_posts_log():
-    if not os.path.exists(POSTS_LOG_FILE):
-        return []
-    with open(POSTS_LOG_FILE, newline="") as f:
-        return [row for row in csv.DictReader(f) if row["status"] == "posted"]
+    """人が選んだ投稿と自動投稿を、同じ形にまとめて返す"""
+    posts = []
+    if os.path.exists(POSTS_LOG_FILE):
+        with open(POSTS_LOG_FILE, newline="") as f:
+            posts = [row for row in csv.DictReader(f) if row["status"] == "posted"]
+    for row in load_auto_log():
+        posts.append({
+            "tweet_id": row["tweet_id"],
+            "draft_choice": f"auto-{row['kind']}",
+            "link_mode": "none",
+        })
+    return posts
 
 
 def group_medians(posts, rows, key, now):
