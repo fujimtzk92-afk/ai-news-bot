@@ -65,6 +65,7 @@ def setup(tmp_path, monkeypatch):
 
 def test_next_kind_rotates_through_the_day():
     log = [log_row(NOW, minutes_ago=60 * (i + 1)) for i in range(3)]
+    assert set(auto_post.KINDS) == set(auto_post.KIND_RULES)
     assert auto_post.next_kind([], NOW) == auto_post.KINDS[0]
     assert auto_post.next_kind(log, NOW) == auto_post.KINDS[3]
 
@@ -192,3 +193,42 @@ def test_metrics_reads_auto_posts(setup, tmp_path, monkeypatch):
     assert metrics.load_posts_log() == [
         {"tweet_id": "42", "draft_choice": "auto-question", "link_mode": "none"}
     ]
+
+
+def idea_entry(link="https://idea.example/1", title="Show HN: Avatar town"):
+    return FeedEntry(link=link, title=title, summary="<p>AI avatars meet</p>", feed_name="Show HN")
+
+
+def test_idea_post_uses_the_chosen_idea(setup, monkeypatch):
+    ideas = [idea_entry("https://idea.example/1", "one"), idea_entry("https://idea.example/2", "two")]
+    monkeypatch.setattr(auto_post, "collect_ideas", lambda used, now: ideas)
+    monkeypatch.setattr(auto_post, "next_kind", lambda log, now: "idea")
+    x = FakeX()
+    claude = FakeClaude(["2", "分身が町で出会う試作だ。"])
+
+    auto_post.run(claude, lambda: x, NOW)
+
+    row = auto_post.load_log()[0]
+    assert row["kind"] == "idea"
+    assert row["article_url"] == "https://idea.example/2"
+    assert "AI avatars meet" in claude.prompts[1]
+    assert "<p>" not in claude.prompts[1]
+
+
+@pytest.mark.parametrize("answer", ["0", "なし", "9"])
+def test_idea_falls_back_to_question_when_nothing_fits(setup, monkeypatch, answer):
+    monkeypatch.setattr(auto_post, "collect_ideas", lambda used, now: [idea_entry()])
+    monkeypatch.setattr(auto_post, "next_kind", lambda log, now: "idea")
+    auto_post.run(FakeClaude([answer, "問いだ。"]), FakeX, NOW)
+    assert auto_post.load_log()[0]["kind"] == "question"
+
+
+def test_collect_ideas_skips_used_and_old():
+    from datetime import datetime as dt
+    now = NOW.timestamp()
+    def entry(link, age_days):
+        published = dt.fromtimestamp(now - age_days * 86400, timezone.utc).timetuple()
+        return FeedEntry(link=link, title="t", published_parsed=published)
+    feed = SimpleNamespace(entries=[entry("used", 0), entry("old", 9), entry("new", 0)])
+    ideas = auto_post.collect_ideas(["used"], now, parse=lambda url: feed)
+    assert {e.link for e in ideas} == {"new"}

@@ -23,6 +23,7 @@ DRAFT_NAMES = {
     "1": "案1 速報", "2": "案2 解説", "3": "案3 意見",
     "auto-news": "自動 速報", "auto-explain": "自動 解説",
     "auto-opinion": "自動 意見", "auto-question": "自動 問い",
+    "auto-idea": "自動 アイデア",
 }
 
 

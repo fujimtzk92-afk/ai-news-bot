@@ -6,7 +6,7 @@ This bot turns AI news into Japanese drafts once a day. I choose one draft on Te
 ## How it works
 Get news from several RSS feeds -> skip posted and old articles -> Claude selects one article -> Claude writes three drafts -> I choose on Telegram -> post on X -> record the result in `posted.txt` and `posts.csv`
 
-`auto_post.py` posts ten times a day without links and without my check. It rotates four types: news, explanation, opinion, and question. Posts with links cost more on the X API, so the bot does not post text that X would treat as a link. It stops at ten posts a day and records each post in `auto_posts.jsonl`. `python auto_post.py --dry-run` only prints the text.
+`auto_post.py` posts ten times a day without links and without my check. It rotates five types: news, explanation, opinion, question, and idea. For the idea type, it picks an interesting AI project from the Show HN and Product Hunt feeds. Posts with links cost more on the X API, so the bot does not post text that X would treat as a link. It stops at ten posts a day and records each post in `auto_posts.jsonl`. `python auto_post.py --dry-run` only prints the text.
 
 Once a week, `metrics.py` saves the numbers for my posts to `metrics.csv` and sends a report to Telegram. It compares draft types and link placement (in the post or in a reply).
 

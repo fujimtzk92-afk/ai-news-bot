@@ -12,6 +12,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import anthropic
+import feedparser
 import tweepy
 
 from main import (
@@ -19,6 +20,7 @@ from main import (
     ask_claude,
     collect_candidates,
     fetch_article_text,
+    is_recent,
     load_posted,
     select_entry,
     send_telegram,
@@ -33,9 +35,16 @@ JST = timezone(timedelta(hours=9))
 
 # 1日の中で回す順番。記事がない時は「問い」に切り替える
 KINDS = [
-    "news", "question", "opinion", "news", "explain",
-    "question", "news", "opinion", "question", "explain",
+    "news", "question", "idea", "news", "explain",
+    "question", "opinion", "idea", "question", "news",
 ]
+
+# 人が作った物を自分で載せる場所。ここから、AIを使った面白いアイデアを拾う
+IDEA_FEEDS = {
+    "Show HN": "https://news.ycombinator.com/showrss",
+    "Product Hunt": "https://www.producthunt.com/feed",
+}
+MAX_IDEAS_PER_FEED = 20
 
 KIND_RULES = {
     "news": (
@@ -52,6 +61,12 @@ KIND_RULES = {
         "【意見】発信者としての意見を一つ言い切り、その理由を書く。"
         "多くの人が当然だと思っていることに反対するか、意外な角度から言う。200〜300文字",
         350,
+    ),
+    "idea": (
+        "【アイデア】誰かが作ったAIの面白い使い方や試作を1つ紹介する。"
+        "まず、その名前と、何をするものかを1〜2文で具体的に書く。"
+        "次に、どこが面白いかを発信者の見方で一言。200文字以内",
+        240,
     ),
     "question": (
         "【問い】読者が自分の答えを考えたくなる問いを一つ書く。答えが人によって分かれる問いにする。"
@@ -152,6 +167,21 @@ def build_prompt(kind, recent, entry=None, article_text="", theme=""):
 最近の投稿:
 {recent}
 """
+    if kind == "idea":
+        return head + f"""- 下の「分かっていること」に書かれている範囲だけで説明する。機能、数字、作った人の話を付け足さない
+- 分かることが少なければ、短く書く
+- 発信者が使ったかのようには書かない
+- 宣伝の言葉（革命的、最強、など）をそのまま写さない
+
+最近の投稿:
+{recent}
+
+載っていた場所: {entry['feed_name']}
+名前と一言: {entry.title}
+
+分かっていること:
+{article_text}
+"""
     return head + f"""- 最初に何が起きたかを1文で書く
 - 記事の中の具体的な名前・数字・事実を使う。記事に書かれていない事実や数字は書かない
 - 「〜という記事が出た」のように記事そのものを話題にせず、記事の中身を直接書く
@@ -193,11 +223,67 @@ def write_post(client, kind, prompt):
     return None
 
 
+def collect_ideas(used, now, parse=feedparser.parse):
+    ideas = []
+    for name, url in IDEA_FEEDS.items():
+        entries = parse(url).entries
+        fresh = [e for e in entries if e.link not in used and is_recent(e, now)]
+        for entry in fresh[:MAX_IDEAS_PER_FEED]:
+            entry["feed_name"] = name
+            ideas.append(entry)
+    return ideas
+
+
+def build_idea_select_prompt(ideas):
+    listing = ""
+    for i, e in enumerate(ideas, start=1):
+        summary = strip_tags(e.get("summary", ""))[:200]
+        listing += f"{i}. [{e['feed_name']}] {e.title}\n{summary}\n\n"
+    return f"""次は、人が作って公開した物の一覧です。この中から、AIを使った面白いアイデアを1つ選んでください。
+
+選ぶ基準（上ほど優先）:
+- AIの新しい使い方、変わった試作、意外な組み合わせ。聞いた人が「その手があったか」と思うもの
+- 一言で説明できて、開発者でない人にも面白さが伝わるもの
+- 例: AIどうしが勝手に会話や交流をして人はそれを眺める場、昔の自分の日記と話せる道具
+
+避けるもの:
+- AIと関係のないもの
+- 開発者向けの道具や部品で、説明に専門知識が要るもの
+- よくある物（文章の要約、チャット窓口、議事録など）の作り直し
+- 投資、暗号資産、成人向け、医療の効果をうたうもの
+
+一覧:
+{listing}
+選んだ番号だけを出力してください。当てはまるものが1つもなければ 0 を出力してください。"""
+
+
+def strip_tags(html):
+    return " ".join(re.sub(r"<[^>]+>", " ", html).split())
+
+
+def select_idea(client, ideas):
+    """面白いアイデアを1つ選ぶ。当てはまるものがなければ None"""
+    if not ideas:
+        return None
+    answer = ask_claude(client, build_idea_select_prompt(ideas), 8000)
+    numbers = re.findall(r"\d+", answer)
+    index = int(numbers[0]) if numbers else 0
+    return ideas[index - 1] if 1 <= index <= len(ideas) else None
+
+
 def choose_material(client, kind, log, now):
     """記事を使う型なら記事を選ぶ。使える記事がなければ「問い」に切り替える"""
     if kind == "question":
         return kind, None, ""
     used = load_posted() + [r["article_url"] for r in log if r.get("article_url")]
+    if kind == "idea":
+        entry = select_idea(client, collect_ideas(used, now.timestamp()))
+        if entry is None:
+            print("面白いアイデアが見つからないので、問いにする")
+            return "question", None, ""
+        summary = strip_tags(entry.get("summary", ""))
+        page = fetch_article_text(entry.link)[:3000]
+        return kind, entry, f"{summary}\n\n{page}".strip()
     candidates = collect_candidates(used, now.timestamp())
     if not candidates:
         print("使える記事がないので、問いにする")
