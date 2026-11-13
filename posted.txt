@@ -19,3 +19,4 @@ https://techcrunch.com/podcast/how-a-blue-wave-midterm-might-reshape-the-ai-indu
 https://arstechnica.com/tech-policy/2026/11/does-meta-think-we-cant-read-meta-abandons-sketchy-commercial-terms-update/
 https://arstechnica.com/ai/2026/11/claude-code-settings-files-expose-thousands-of-secrets-on-github/
 https://deepmind.google/blog/gemini-4-carbon-is-now-available/
+https://deepmind.google/blog/introducing-gemini-4-hydrogen/
