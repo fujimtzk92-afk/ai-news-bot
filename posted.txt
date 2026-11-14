@@ -20,3 +20,4 @@ https://arstechnica.com/tech-policy/2026/11/does-meta-think-we-cant-read-meta-ab
 https://arstechnica.com/ai/2026/11/claude-code-settings-files-expose-thousands-of-secrets-on-github/
 https://deepmind.google/blog/gemini-4-carbon-is-now-available/
 https://deepmind.google/blog/introducing-gemini-4-hydrogen/
+https://blog.google/products-and-platforms/products/search/gemini-4-hydrogen-search-upgrade/
