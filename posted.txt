@@ -23,3 +23,4 @@ https://deepmind.google/blog/introducing-gemini-4-hydrogen/
 https://blog.google/products-and-platforms/products/search/gemini-4-hydrogen-search-upgrade/
 https://techcrunch.com/2026/11/13/jensen-huangs-departure-blasts-big-hole-in-ai-startup-funding-vcs-and-founders-say/
 https://arstechnica.com/features/2026/11/faa-expands-ai-advice-to-manage-air-traffic-congestion-across-entire-us-airspace/
+https://arstechnica.com/tech-policy/2026/11/us-moves-to-cut-chinas-remote-access-to-ai-chips/

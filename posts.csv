@@ -9,3 +9,4 @@ date_utc,status,tweet_id,article_url,feed,draft_choice,link_mode,length
 2026-11-14 01:59,posted,2121422791232881117,https://blog.google/products-and-platforms/products/search/gemini-4-hydrogen-search-upgrade/,Google AI,2,inline,367
 2026-11-15 01:44,posted,2121781383853170797,https://techcrunch.com/2026/11/13/jensen-huangs-departure-blasts-big-hole-in-ai-startup-funding-vcs-and-founders-say/,TechCrunch,2,reply,345
 2026-11-16 02:03,posted,2122148460811964623,https://arstechnica.com/features/2026/11/faa-expands-ai-advice-to-manage-air-traffic-congestion-across-entire-us-airspace/,Ars Technica,2,inline,377
+2026-11-17 05:20,skipped,,https://arstechnica.com/tech-policy/2026/11/us-moves-to-cut-chinas-remote-access-to-ai-chips/,Ars Technica,0,,
